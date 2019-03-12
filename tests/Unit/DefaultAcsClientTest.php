@@ -8,13 +8,15 @@ use AlibabaCloud\Client\Exception\ClientException;
 use AlibabaCloud\Client\Exception\ServerException;
 use AlibabaCloud\Client\Profile\DefaultProfile;
 use AlibabaCloud\Client\Result\Result;
+use AlibabaCloud\Client\SDK;
 use AlibabaCloud\Client\Tests\Mock\Services\Ecs\DescribeRegionsRequest;
+use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Class DefaultAcsClientTest
  *
- * @package   AlibabaCloud\Client\Tests\Unit\Client
+ * @package   AlibabaCloud\Client\Tests\Unit
  *
  * @coversDefaultClass \AlibabaCloud\Client\DefaultAcsClient
  */
@@ -31,6 +33,9 @@ class DefaultAcsClientTest extends TestCase
      */
     private static $client;
 
+    /**
+     * @throws ClientException
+     */
     public function setUp()
     {
         parent::setUp();
@@ -44,11 +49,12 @@ class DefaultAcsClientTest extends TestCase
 
     /**
      * @throws ServerException
+     * @throws ClientException
      */
     public function testAccessKeyClient()
     {
         $request = new DescribeRegionsRequest();
-        $request->setContent(\time());
+        $request->body(\time());
         $this->assertEquals(
             \time(),
             $request->getContent()
@@ -99,20 +105,37 @@ class DefaultAcsClientTest extends TestCase
         }
     }
 
+    /**
+     * @expectedException \AlibabaCloud\Client\Exception\ClientException
+     * @expectedExceptionMessage Format must be a string
+     * @throws ClientException
+     * @throws ServerException
+     */
     public function testFormatNull()
     {
-        try {
-            $request = new DescribeRegionsRequest();
-            $request->format(null);
-            $response = self::$client->getAcsResponse($request);
-            $this->assertNotNull($response);
-        } catch (ClientException $e) {
-            self::assertStringStartsWith('cURL error ', $e->getMessage());
-        } catch (ServerException $e) {
-            self::assertEquals('', $e->getResult()->getResponse()->getBody()->getContents());
-        }
+        $request = new DescribeRegionsRequest();
+        $request->format(null);
+        $response = self::$client->getAcsResponse($request);
+        $this->assertNotNull($response);
     }
 
+    /**
+     * @expectedException \AlibabaCloud\Client\Exception\ClientException
+     * @expectedExceptionMessage Format cannot be empty
+     * @throws ClientException
+     * @throws ServerException
+     */
+    public function testFormatEmpty()
+    {
+        $request = new DescribeRegionsRequest();
+        $request->format('');
+        $response = self::$client->getAcsResponse($request);
+        $this->assertNotNull($response);
+    }
+
+    /**
+     * @throws ServerException
+     */
     public function testBadMethod()
     {
         try {
@@ -125,6 +148,9 @@ class DefaultAcsClientTest extends TestCase
         }
     }
 
+    /**
+     * @throws ServerException
+     */
     public function testPOST()
     {
         try {
@@ -137,6 +163,9 @@ class DefaultAcsClientTest extends TestCase
         }
     }
 
+    /**
+     * @throws ServerException
+     */
     public function testBadProtocol()
     {
         try {
@@ -162,49 +191,37 @@ class DefaultAcsClientTest extends TestCase
                 $e->getErrorMessage()
             );
         } catch (ClientException $e) {
-            self::assertEquals(\ALIBABA_CLOUD_SERVER_UNREACHABLE, $e->getErrorCode());
+            self::assertEquals(SDK::SERVER_UNREACHABLE, $e->getErrorCode());
         }
     }
 
-    public function testBadProduct()
-    {
-        try {
-            $request = new DescribeRegionsRequest();
-            $request->timeout(\ALIBABA_CLOUD_TIMEOUT);
-            $request->connectTimeout(10);
-            $request->product('BadProduct');
-            $request->connectTimeout(15);
-            $request->timeout(20);
-            $response = self::$client->getAcsResponse($request);
-            $this->assertNotNull($response);
-        } catch (ClientException $e) {
-            $expected = [
-                'The specified parameter "Action or Version" is not valid.',
-                'Can\'t resolve host for BadProduct in cn-hangzhou, You can specify host via the host() method.',
-            ];
-
-            $this->assertContains($e->getErrorMessage(), $expected);
-        }
-    }
-
+    /**
+     * @expectedException \AlibabaCloud\Client\Exception\ServerException
+     * @expectedExceptionMessageRegExp /Specified parameter Version is not valid./
+     * @expectedExceptionCode          400
+     * @throws ClientException
+     */
     public function testBadVersion()
     {
-        try {
-            $request = new DescribeRegionsRequest();
-            $request->version('BadVersion');
-            $response = self::$client->getAcsResponse($request);
-            $this->assertNotNull($response);
-        } catch (ServerException $e) {
-            self::assertEquals(
-                'Specified parameter Version is not valid.',
-                $e->getErrorMessage()
-            );
-        } catch (ClientException $e) {
-            // Assert
-            self::assertEquals(\ALIBABA_CLOUD_SERVER_UNREACHABLE, $e->getErrorCode());
-        }
+        AlibabaCloud::mockResponse(
+            400,
+            [],
+            [
+                                       'Message' => 'Specified parameter Version is not valid.',
+                                   ]
+        );
+        $request = new DescribeRegionsRequest();
+        $request->version('BadVersion');
+        $request->connectTimeout(25);
+        $request->timeout(30);
+        $response = self::$client->getAcsResponse($request);
+        $this->assertNotNull($response);
     }
 
+    /**
+     * @throws ClientException
+     * @throws ServerException
+     */
     public function testResult()
     {
         AlibabaCloud::accessKeyClient(
@@ -212,9 +229,9 @@ class DefaultAcsClientTest extends TestCase
             \getenv('ACCESS_KEY_SECRET')
         )
                     ->regionId('cn-hangzhou')
-                    ->asGlobalClient();
+                    ->asDefaultClient();
 
-        $result = self::$client->getAcsResponse(new Result(new \GuzzleHttp\Psr7\Response));
+        $result = self::$client->getAcsResponse(new Result(new Response));
 
         self::assertInstanceOf(Result::class, $result);
     }

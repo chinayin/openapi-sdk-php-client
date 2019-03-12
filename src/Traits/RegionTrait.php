@@ -2,39 +2,34 @@
 
 namespace AlibabaCloud\Client\Traits;
 
-use AlibabaCloud\Client\AlibabaCloud;
+use AlibabaCloud\Client\Exception\ClientException;
+use AlibabaCloud\Client\Filter\ClientFilter;
 
 /**
  * Trait RegionTrait
  *
- * @package   AlibabaCloud\Client\Traits
- *
- * @mixin     AlibabaCloud
+ * @package AlibabaCloud\Client\Traits
  */
 trait RegionTrait
 {
-    /**
-     * @var string|null Global default RegionId
-     */
-    protected static $globalRegionId;
 
     /**
-     * Set the Global default RegionId.
-     *
-     * @param string $globalRegionId
+     * @var string|null
      */
-    public static function setGlobalRegionId($globalRegionId)
-    {
-        self::$globalRegionId = $globalRegionId;
-    }
+    public $regionId;
 
     /**
-     * Get the Global default RegionId.
+     * @param string $regionId
      *
-     * @return string|null
+     * @return $this
+     * @throws ClientException
      */
-    public static function getGlobalRegionId()
+    public function regionId($regionId)
     {
-        return self::$globalRegionId;
+        ClientFilter::regionId($regionId);
+
+        $this->regionId = $regionId;
+
+        return $this;
     }
 }

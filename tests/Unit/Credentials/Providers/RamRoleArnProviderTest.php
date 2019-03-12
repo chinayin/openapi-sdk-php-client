@@ -2,12 +2,15 @@
 
 namespace AlibabaCloud\Client\Tests\Unit\Credentials\Providers;
 
+use AlibabaCloud\Client\AlibabaCloud;
 use AlibabaCloud\Client\Clients\RamRoleArnClient;
 use AlibabaCloud\Client\Credentials\Providers\RamRoleArnProvider;
 use AlibabaCloud\Client\Credentials\StsCredential;
 use AlibabaCloud\Client\Exception\ClientException;
 use AlibabaCloud\Client\Exception\ServerException;
+use AlibabaCloud\Client\SDK;
 use PHPUnit\Framework\TestCase;
+use ReflectionException;
 
 /**
  * Class RamRoleArnProviderTest
@@ -18,6 +21,9 @@ use PHPUnit\Framework\TestCase;
  */
 class RamRoleArnProviderTest extends TestCase
 {
+    /**
+     * @throws ClientException
+     */
     public function testGet()
     {
         // Setup
@@ -34,7 +40,7 @@ class RamRoleArnProviderTest extends TestCase
             $actual = $provider->get();
             self::assertInstanceOf(StsCredential::class, $actual);
         } catch (ClientException $e) {
-            self::assertEquals(\ALIBABA_CLOUD_SERVER_UNREACHABLE, $e->getErrorCode());
+            self::assertEquals(SDK::SERVER_UNREACHABLE, $e->getErrorCode());
         } catch (ServerException $e) {
             self::assertEquals('InvalidAccessKeyId.NotFound', $e->getErrorCode());
         }
@@ -43,7 +49,7 @@ class RamRoleArnProviderTest extends TestCase
     /**
      * @throws ClientException
      * @throws ServerException
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function testGetInCache()
     {
@@ -71,7 +77,61 @@ class RamRoleArnProviderTest extends TestCase
         $cacheMethod->invokeArgs($provider, [$result]);
 
         $actual = $provider->get();
+
         // Assert
         self::assertInstanceOf(StsCredential::class, $actual);
+    }
+
+    /**
+     * @expectedException \AlibabaCloud\Client\Exception\ServerException
+     * @expectedExceptionMessage SDK.InvalidCredential: Result contains no credentials RequestId:
+     * @throws ClientException
+     * @throws ServerException
+     */
+    public function testNoCredentials()
+    {
+        AlibabaCloud::mockResponse();
+
+        $client = AlibabaCloud::ramRoleArnClient('id', 'secret', 'arn', 'session');
+
+        $provider = new RamRoleArnProvider($client);
+        $provider->get();
+    }
+
+    /**
+     * @throws ClientException
+     * @throws ServerException
+     */
+    public function testOk()
+    {
+        AlibabaCloud::mockResponse(
+            200,
+            [],
+            '{
+    "RequestId": "88FEA385-EF5D-4A8A-8C00-A07DAE3BFD44",
+    "AssumedRoleUser": {
+        "AssumedRoleId": "********************",
+        "Arn": "********************"
+    },
+    "Credentials": {
+        "AccessKeySecret": "********************",
+        "AccessKeyId": "STS.**************",
+        "Expiration": "2020-02-25T03:56:19Z",
+        "SecurityToken": "**************"
+    }
+}'
+        );
+
+        $client = AlibabaCloud::ramRoleArnClient('id', 'secret', 'arn', 'session');
+
+        $provider   = new RamRoleArnProvider($client);
+        $credential = $provider->get();
+        self::assertInstanceOf(StsCredential::class, $credential);
+    }
+
+    protected function tearDown()
+    {
+        parent::tearDown();
+        AlibabaCloud::cancelMock();
     }
 }

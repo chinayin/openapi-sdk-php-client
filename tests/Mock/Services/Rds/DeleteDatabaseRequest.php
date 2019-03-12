@@ -2,6 +2,7 @@
 
 namespace AlibabaCloud\Client\Tests\Mock\Services\Rds;
 
+use AlibabaCloud\Client\Exception\ClientException;
 use AlibabaCloud\Client\Request\RpcRequest;
 
 /**
@@ -15,9 +16,36 @@ class DeleteDatabaseRequest extends RpcRequest
 {
 
     /**
+     * @var
+     */
+    private $resourceOwnerId;
+    /**
+     * @var
+     */
+    private $dBName;
+    /**
+     * @var
+     */
+    private $resourceOwnerAccount;
+    /**
+     * @var
+     */
+    private $ownerAccount;
+    /**
+     * @var
+     */
+    private $dBInstanceId;
+    /**
+     * @var
+     */
+    private $ownerId;
+
+    /**
      * DeleteDatabaseRequest constructor.
      *
      * @param array $options
+     *
+     * @throws ClientException
      */
     public function __construct(array $options = [])
     {
@@ -30,36 +58,6 @@ class DeleteDatabaseRequest extends RpcRequest
         $this->endpointType = 'openAPI';
         $this->options($options);
     }
-
-    /**
-     * @var
-     */
-    private $resourceOwnerId;
-
-    /**
-     * @var
-     */
-    private $dBName;
-
-    /**
-     * @var
-     */
-    private $resourceOwnerAccount;
-
-    /**
-     * @var
-     */
-    private $ownerAccount;
-
-    /**
-     * @var
-     */
-    private $dBInstanceId;
-
-    /**
-     * @var
-     */
-    private $ownerId;
 
     /**
      * @return mixed

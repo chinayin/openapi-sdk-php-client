@@ -3,6 +3,7 @@
 namespace AlibabaCloud\Client\Exception;
 
 use AlibabaCloud\Client\Result\Result;
+use AlibabaCloud\Client\SDK;
 use Stringy\Stringy;
 
 /**
@@ -30,29 +31,17 @@ class ServerException extends AlibabaCloudException
      * @param string      $errorMessage
      * @param string      $errorCode
      */
-    public function __construct(Result $result, $errorMessage = '', $errorCode = '')
-    {
-        $this->result = $result;
-        $this->settingProperties();
-
-        if ($errorCode !== '') {
-            $this->errorCode = $errorCode;
-        }
-
-        if ($errorMessage !== '') {
-            $this->errorMessage = $errorMessage;
-        }
-
-        if (!$this->errorMessage) {
-            $this->errorMessage = (string)$this->result->getResponse()->getBody();
-        }
-
-        // If the string to be signed are the same with server's, it is considered a credential error.
-        if ($this->result->getRequest()
-            && Stringy::create($this->errorMessage)->contains($this->result->getRequest()->stringToBeSigned())) {
-            $this->errorCode    = 'InvalidAccessKeySecret';
-            $this->errorMessage = 'Specified Access Key Secret is not valid.';
-        }
+    public function __construct(
+        Result $result,
+        $errorMessage = SDK::RESPONSE_EMPTY,
+        $errorCode = SDK::SERVICE_UNKNOWN_ERROR
+    ) {
+        $this->result       = $result;
+        $this->errorMessage = $errorMessage;
+        $this->errorCode    = $errorCode;
+        $this->resolvePropertiesByReturn();
+        $this->distinguishSignatureErrors();
+        $this->bodyAsErrorMessage();
 
         parent::__construct(
             $this->getMessageString(),
@@ -61,29 +50,11 @@ class ServerException extends AlibabaCloudException
     }
 
     /**
-     * Get standard exception message.
+     * Resolve the error message based on the return of the server.
      *
-     * @return string
-     */
-    private function getMessageString()
-    {
-        $message = "$this->errorCode: $this->errorMessage RequestId: $this->requestId";
-
-        if ($this->getResult()->getRequest()) {
-            $method  = $this->getResult()->getRequest()->method;
-            $uri     = (string)$this->getResult()->getRequest()->uri;
-            $message .= " $method \"$uri\"";
-            if ($this->result->getResponse()) {
-                $message .= ' ' . $this->result->getResponse()->getStatusCode();
-            }
-        }
-        return $message;
-    }
-
-    /**
      * @return void
      */
-    private function settingProperties()
+    private function resolvePropertiesByReturn()
     {
         if (isset($this->result['message'])) {
             $this->errorMessage = $this->result['message'];
@@ -106,15 +77,48 @@ class ServerException extends AlibabaCloudException
     }
 
     /**
-     * @codeCoverageIgnore
-     *
-     * @deprecated deprecated since version 2.0.
+     * If the string to be signed are the same with server's, it is considered a credential error.
+     */
+    private function distinguishSignatureErrors()
+    {
+        if ($this->result->getRequest()
+            && Stringy::create($this->errorMessage)->contains($this->result->getRequest()->stringToBeSigned())) {
+            $this->errorCode    = 'InvalidAccessKeySecret';
+            $this->errorMessage = 'Specified Access Key Secret is not valid.';
+        }
+    }
+
+    /**
+     * If the error message matches the default message and
+     * the server has returned content, use the return content
+     */
+    private function bodyAsErrorMessage()
+    {
+        $body = (string)$this->result->getResponse()->getBody();
+        if ($this->errorMessage === SDK::RESPONSE_EMPTY && $body) {
+            $this->errorMessage = $body;
+        }
+    }
+
+    /**
+     * Get standard exception message.
      *
      * @return string
      */
-    public function getErrorType()
+    private function getMessageString()
     {
-        return 'Server';
+        $message = "$this->errorCode: $this->errorMessage RequestId: $this->requestId";
+
+        if ($this->getResult()->getRequest()) {
+            $method  = $this->getResult()->getRequest()->method;
+            $uri     = (string)$this->getResult()->getRequest()->uri;
+            $message .= " $method \"$uri\"";
+            if ($this->result->getResponse()) {
+                $message .= ' ' . $this->result->getResponse()->getStatusCode();
+            }
+        }
+
+        return $message;
     }
 
     /**
@@ -123,6 +127,17 @@ class ServerException extends AlibabaCloudException
     public function getResult()
     {
         return $this->result;
+    }
+
+    /**
+     * @codeCoverageIgnore
+     *
+     * @return string
+     * @deprecated deprecated since version 2.0.
+     */
+    public function getErrorType()
+    {
+        return 'Server';
     }
 
     /**
@@ -135,9 +150,8 @@ class ServerException extends AlibabaCloudException
 
     /**
      * @codeCoverageIgnore
-     * @deprecated deprecated since version 2.0.
-     *
      * @return int
+     * @deprecated deprecated since version 2.0.
      */
     public function getHttpStatus()
     {

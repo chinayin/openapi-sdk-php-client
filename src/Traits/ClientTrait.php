@@ -12,7 +12,10 @@ use AlibabaCloud\Client\Clients\RsaKeyPairClient;
 use AlibabaCloud\Client\Clients\StsClient;
 use AlibabaCloud\Client\Credentials\CredentialsInterface;
 use AlibabaCloud\Client\Credentials\Ini\IniCredential;
+use AlibabaCloud\Client\Credentials\Providers\CredentialsProvider;
 use AlibabaCloud\Client\Exception\ClientException;
+use AlibabaCloud\Client\Filter\ClientFilter;
+use AlibabaCloud\Client\SDK;
 use AlibabaCloud\Client\Signature\SignatureInterface;
 
 /**
@@ -30,32 +33,16 @@ trait ClientTrait
     protected static $clients = [];
 
     /**
-     * Get the Client instance by name.
-     *
-     * @param string $clientName
-     *
-     * @return Client
-     * @throws ClientException
-     */
-    public static function get($clientName)
-    {
-        if (self::has($clientName)) {
-            return self::$clients[\strtolower($clientName)];
-        }
-        throw new ClientException(
-            "Client not found: $clientName",
-            \ALIBABA_CLOUD_CLIENT_NOT_FOUND
-        );
-    }
-
-    /**
      * @param string $clientName
      * @param Client $client
      *
      * @return Client
+     * @throws ClientException
      */
     public static function set($clientName, Client $client)
     {
+        ClientFilter::clientName($clientName);
+
         return self::$clients[\strtolower($clientName)] = $client;
     }
 
@@ -72,11 +59,15 @@ trait ClientTrait
     /**
      * Delete the client by specifying name.
      *
-     * @param string $name
+     * @param string $clientName
+     *
+     * @throws ClientException
      */
-    public static function del($name)
+    public static function del($clientName)
     {
-        unset(self::$clients[\strtolower($name)]);
+        ClientFilter::clientName($clientName);
+
+        unset(self::$clients[\strtolower($clientName)]);
     }
 
     /**
@@ -86,11 +77,13 @@ trait ClientTrait
      */
     public static function flush()
     {
-        self::$clients        = [];
-        self::$globalRegionId = null;
+        self::$clients         = [];
+        self::$defaultRegionId = null;
     }
 
     /**
+     * @codeCoverageIgnore
+     * @deprecated
      * Get the global client.
      *
      * @return Client
@@ -98,7 +91,40 @@ trait ClientTrait
      */
     public static function getGlobalClient()
     {
-        return self::get(\ALIBABA_CLOUD_GLOBAL_CLIENT);
+        return self::getDefaultClient();
+    }
+
+    /**
+     * Get the default client.
+     *
+     * @return Client
+     * @throws ClientException
+     */
+    public static function getDefaultClient()
+    {
+        return self::get(CredentialsProvider::getDefaultName());
+    }
+
+    /**
+     * Get the Client instance by name.
+     *
+     * @param string $clientName
+     *
+     * @return Client
+     * @throws ClientException
+     */
+    public static function get($clientName)
+    {
+        ClientFilter::clientName($clientName);
+
+        if (self::has($clientName)) {
+            return self::$clients[\strtolower($clientName)];
+        }
+
+        throw new ClientException(
+            "Client '$clientName' not found",
+            SDK::CLIENT_NOT_FOUND
+        );
     }
 
     /**
@@ -107,9 +133,12 @@ trait ClientTrait
      * @param string $clientName
      *
      * @return bool
+     * @throws ClientException
      */
     public static function has($clientName)
     {
+        ClientFilter::clientName($clientName);
+
         return isset(self::$clients[\strtolower($clientName)]);
     }
 
@@ -128,6 +157,7 @@ trait ClientTrait
         foreach (\func_get_args() as $filename) {
             $list[$filename] = (new IniCredential($filename))->load();
         }
+
         return $list;
     }
 
@@ -151,6 +181,7 @@ trait ClientTrait
      * @param string $accessKeySecret
      *
      * @return AccessKeyClient
+     * @throws ClientException
      */
     public static function accessKeyClient($accessKeyId, $accessKeySecret)
     {
@@ -166,6 +197,7 @@ trait ClientTrait
      * @param string $roleSessionName
      *
      * @return RamRoleArnClient
+     * @throws ClientException
      */
     public static function ramRoleArnClient($accessKeyId, $accessKeySecret, $roleArn, $roleSessionName)
     {
@@ -178,6 +210,7 @@ trait ClientTrait
      * @param string $roleName
      *
      * @return EcsRamRoleClient
+     * @throws ClientException
      */
     public static function ecsRamRoleClient($roleName)
     {
@@ -190,6 +223,7 @@ trait ClientTrait
      * @param string $bearerToken
      *
      * @return BearerTokenClient
+     * @throws ClientException
      */
     public static function bearerTokenClient($bearerToken)
     {
@@ -204,8 +238,9 @@ trait ClientTrait
      * @param string $securityToken   Security Token
      *
      * @return StsClient
+     * @throws ClientException
      */
-    public static function stsClient($accessKeyId, $accessKeySecret, $securityToken)
+    public static function stsClient($accessKeyId, $accessKeySecret, $securityToken = '')
     {
         return new StsClient($accessKeyId, $accessKeySecret, $securityToken);
     }

@@ -2,6 +2,7 @@
 
 namespace AlibabaCloud\Client\Tests\Mock\Services\Dds;
 
+use AlibabaCloud\Client\Exception\ClientException;
 use AlibabaCloud\Client\Request\RpcRequest;
 
 /**
@@ -13,9 +14,32 @@ class DescribeRegionsRequest extends RpcRequest
 {
 
     /**
+     * @var
+     */
+    private $resourceOwnerId;
+    /**
+     * @var
+     */
+    private $securityToken;
+    /**
+     * @var
+     */
+    private $resourceOwnerAccount;
+    /**
+     * @var
+     */
+    private $ownerAccount;
+    /**
+     * @var
+     */
+    private $ownerId;
+
+    /**
      * DescribeRegionsRequest constructor.
      *
      * @param array $options
+     *
+     * @throws ClientException
      */
     public function __construct(array $options = [])
     {
@@ -28,31 +52,6 @@ class DescribeRegionsRequest extends RpcRequest
         $this->endpointType = 'openAPI';
         $this->options($options);
     }
-
-    /**
-     * @var
-     */
-    private $resourceOwnerId;
-
-    /**
-     * @var
-     */
-    private $securityToken;
-
-    /**
-     * @var
-     */
-    private $resourceOwnerAccount;
-
-    /**
-     * @var
-     */
-    private $ownerAccount;
-
-    /**
-     * @var
-     */
-    private $ownerId;
 
     /**
      * @return mixed

@@ -5,7 +5,12 @@ namespace AlibabaCloud\Client\Regions;
 use AlibabaCloud\Client\Config\Config;
 use AlibabaCloud\Client\Exception\ClientException;
 use AlibabaCloud\Client\Exception\ServerException;
+use AlibabaCloud\Client\Filter\ApiFilter;
+use AlibabaCloud\Client\Filter\ClientFilter;
+use AlibabaCloud\Client\Filter\HttpFilter;
 use AlibabaCloud\Client\Request\Request;
+use AlibabaCloud\Client\SDK;
+use Exception;
 
 /**
  * Class LocationService
@@ -14,16 +19,20 @@ use AlibabaCloud\Client\Request\Request;
  */
 class LocationService
 {
-
     /**
-     * @var Request
+     * Global Region Name
      */
-    protected $request;
+    const GLOBAL_REGION = 'global';
 
     /**
      * @var array
      */
     protected static $hosts = [];
+
+    /**
+     * @var Request
+     */
+    protected $request;
 
     /**
      * LocationService constructor.
@@ -43,6 +52,7 @@ class LocationService
      *
      * @return mixed
      * @throws ClientException
+     * @throws ServerException
      */
     public static function findProductDomain(Request $request, $domain = 'location.aliyuncs.com')
     {
@@ -55,54 +65,43 @@ class LocationService
      *
      * @return string
      * @throws ClientException
+     * @throws ServerException
      */
     public static function resolveHost(Request $request, $domain = 'location.aliyuncs.com')
     {
-        $instance = new static($request);
-        $product  = $instance->request->product;
-        $regionId = $instance->request->realRegionId();
+        $locationService = new static($request);
+        $product         = $locationService->request->product;
+        $regionId        = $locationService->request->realRegionId();
 
         if (!isset(self::$hosts[$product][$regionId])) {
-            self::$hosts[$product][$regionId] = self::getResult($instance, $domain);
+            self::$hosts[$product][$regionId] = self::getResult($locationService, $domain);
         }
 
         return self::$hosts[$product][$regionId];
     }
 
     /**
-     * @param static $instance
+     * @param static $locationService
      * @param string $domain
      *
      * @return string
      * @throws ClientException
+     * @throws ServerException
      */
-    private static function getResult($instance, $domain)
+    private static function getResult($locationService, $domain)
     {
-        $locationRequest = new LocationServiceRequest($instance->request, $domain);
+        $locationRequest = new LocationServiceRequest($locationService->request, $domain);
 
-        try {
-            $result = $locationRequest->request();
-        } catch (ServerException $exception) {
-            return '';
-        }
+        $result = $locationRequest->request();
 
-        // @codeCoverageIgnoreStart
         if (!isset($result['Endpoints']['Endpoint'][0]['Endpoint'])) {
             throw new ClientException(
-                'Not found RegionId in ' . $domain,
-                \ALIBABA_CLOUD_INVALID_REGION_ID
-            );
-        }
-
-        if (!$result['Endpoints']['Endpoint'][0]['Endpoint']) {
-            throw new ClientException(
-                'Invalid RegionId: ' . $result['Endpoints']['Endpoint'][0]['Endpoint'],
-                \ALIBABA_CLOUD_INVALID_REGION_ID
+                'Not found Region ID in ' . $domain,
+                SDK::INVALID_REGION_ID
             );
         }
 
         return $result['Endpoints']['Endpoint'][0]['Endpoint'];
-        // @codeCoverageIgnoreEnd
     }
 
     /**
@@ -111,6 +110,8 @@ class LocationService
      * @param string $regionId
      * @param string $product
      * @param string $domain
+     *
+     * @throws ClientException
      */
     public static function addEndPoint($regionId, $product, $domain)
     {
@@ -121,9 +122,17 @@ class LocationService
      * @param string $product
      * @param string $host
      * @param string $regionId
+     *
+     * @throws ClientException
      */
-    public static function addHost($product, $host, $regionId = \ALIBABA_CLOUD_GLOBAL_REGION)
+    public static function addHost($product, $host, $regionId = self::GLOBAL_REGION)
     {
+        ApiFilter::product($product);
+
+        HttpFilter::host($host);
+
+        ClientFilter::regionId($regionId);
+
         self::$hosts[$product][$regionId] = $host;
     }
 
@@ -142,7 +151,7 @@ class LocationService
      * Update endpoints from OSS.
      *
      * @codeCoverageIgnore
-     * @throws \Exception
+     * @throws Exception
      */
     public static function updateEndpoints()
     {

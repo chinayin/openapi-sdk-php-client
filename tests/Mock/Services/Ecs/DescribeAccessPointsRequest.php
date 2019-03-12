@@ -2,6 +2,7 @@
 
 namespace AlibabaCloud\Client\Tests\Mock\Services\Ecs;
 
+use AlibabaCloud\Client\Exception\ClientException;
 use AlibabaCloud\Client\Request\RpcRequest;
 
 /**
@@ -13,9 +14,40 @@ class DescribeAccessPointsRequest extends RpcRequest
 {
 
     /**
+     * @var
+     */
+    private $Filters;
+    /**
+     * @var
+     */
+    private $resourceOwnerId;
+    /**
+     * @var
+     */
+    private $resourceOwnerAccount;
+    /**
+     * @var
+     */
+    private $pageSize;
+    /**
+     * @var
+     */
+    private $ownerId;
+    /**
+     * @var
+     */
+    private $type;
+    /**
+     * @var
+     */
+    private $pageNumber;
+
+    /**
      * DescribeAccessPointsRequest constructor.
      *
      * @param array $options
+     *
+     * @throws ClientException
      */
     public function __construct(array $options = [])
     {
@@ -28,41 +60,6 @@ class DescribeAccessPointsRequest extends RpcRequest
         $this->endpointType('openAPI');
         $this->options($options);
     }
-
-    /**
-     * @var
-     */
-    private $Filters;
-
-    /**
-     * @var
-     */
-    private $resourceOwnerId;
-
-    /**
-     * @var
-     */
-    private $resourceOwnerAccount;
-
-    /**
-     * @var
-     */
-    private $pageSize;
-
-    /**
-     * @var
-     */
-    private $ownerId;
-
-    /**
-     * @var
-     */
-    private $type;
-
-    /**
-     * @var
-     */
-    private $pageNumber;
 
     /**
      * @return mixed
@@ -137,6 +134,7 @@ class DescribeAccessPointsRequest extends RpcRequest
     {
         $this->pageSize                     = $pageSize;
         $this->options['query']['PageSize'] = $pageSize;
+
         return $this;
     }
 

@@ -10,21 +10,22 @@ use AlibabaCloud\Client\Signature\ShaHmac1Signature;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Class RamRoleClientTest
+ * Class RamRoleArnClientTest
  *
- * @package   AlibabaCloud\Client\Tests\Unit\Clients
+ * @package AlibabaCloud\Client\Tests\Unit\Clients
  */
 class RamRoleArnClientTest extends TestCase
 {
 
     /**
      * @return RamRoleArnClient
+     * @throws ClientException
      */
     public function testConstruct()
     {
         // Setup
-        $accessKeyId     = '';
-        $accessKeySecret = '';
+        $accessKeyId     = '$accessKeyId';
+        $accessKeySecret = '$accessKeyId';
         $roleArn         = '';
         $roleSessionName = '';
 
@@ -52,7 +53,7 @@ class RamRoleArnClientTest extends TestCase
         try {
             $client->getSessionCredential();
         } catch (ServerException $exception) {
-            self::assertEquals('AccessKeyId is mandatory for this action.', $exception->getErrorMessage());
+            self::assertEquals('Specified access key is not found.', $exception->getErrorMessage());
         } catch (ClientException $exception) {
             self::assertStringStartsWith('cURL error', $exception->getErrorMessage());
         }

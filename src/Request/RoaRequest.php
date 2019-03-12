@@ -7,7 +7,10 @@ use AlibabaCloud\Client\Credentials\BearerTokenCredential;
 use AlibabaCloud\Client\Credentials\CredentialsInterface;
 use AlibabaCloud\Client\Credentials\StsCredential;
 use AlibabaCloud\Client\Exception\ClientException;
+use AlibabaCloud\Client\Filter\ApiFilter;
+use AlibabaCloud\Client\Filter\Filter;
 use AlibabaCloud\Client\Request\Traits\DeprecatedRoaTrait;
+use AlibabaCloud\Client\SDK;
 
 /**
  * RESTful ROA Request.
@@ -17,6 +20,16 @@ use AlibabaCloud\Client\Request\Traits\DeprecatedRoaTrait;
 class RoaRequest extends Request
 {
     use DeprecatedRoaTrait;
+
+    /**
+     * @var string
+     */
+    private static $headerSeparator = "\n";
+
+    /**
+     * @var string
+     */
+    private static $querySeparator = '&';
 
     /**
      * @var string
@@ -34,14 +47,54 @@ class RoaRequest extends Request
     private $dateTimeFormat = "D, d M Y H:i:s \G\M\T";
 
     /**
-     * @var string
+     * Resolve request parameter.
+     *
+     * @param AccessKeyCredential|BearerTokenCredential|StsCredential|CredentialsInterface $credential
+     *
+     * @throws ClientException
      */
-    private static $headerSeparator = "\n";
+    public function resolveParameters($credential)
+    {
+        $signature                                           = $this->httpClient()->getSignature();
+        $this->options['query']['Version']                   = $this->version;
+        $this->options['headers']['x-acs-version']           = $this->version;
+        $this->options['headers']['Date']                    = gmdate($this->dateTimeFormat);
+        $this->options['headers']['Accept']                  = self::formatToAccept($this->format);
+        $this->options['headers']['x-acs-signature-method']  = $signature->getMethod();
+        $this->options['headers']['x-acs-signature-version'] = $signature->getVersion();
+        if ($signature->getType()) {
+            $this->options['headers']['x-acs-signature-type'] = $signature->getType();
+        }
+        $this->options['headers']['x-acs-region-id'] = $this->realRegionId();
+        if (isset($this->options['form_params'])) {
+            $this->options['headers']['Content-MD5'] = $this->contentMD5();
+        }
+        $this->options['headers']['Content-Type'] = "{$this->options['headers']['Accept']};chrset=utf-8";
+
+        $this->resolveSecurityToken($credential);
+        $this->resolveBearerToken($credential);
+
+        $this->sign($credential);
+    }
 
     /**
-     * @var string
+     * Returns the accept header according to format.
+     *
+     * @param string $format
+     *
+     * @return string
      */
-    private static $querySeparator = '&';
+    private static function formatToAccept($format)
+    {
+        switch (\strtoupper($format)) {
+            case 'JSON':
+                return 'application/json';
+            case 'XML':
+                return 'application/xml';
+            default:
+                return 'application/octet-stream';
+        }
+    }
 
     /**
      * Calculate the md5 value of the content.
@@ -56,36 +109,23 @@ class RoaRequest extends Request
     }
 
     /**
-     * Resolve request parameter.
-     *
-     * @param AccessKeyCredential|BearerTokenCredential|StsCredential|CredentialsInterface $credential
-     *
-     * @throws ClientException
+     * @param CredentialsInterface $credential
      */
-    public function resolveParameters($credential)
+    private function resolveSecurityToken(CredentialsInterface $credential)
     {
-        $this->options['query']['Version']                   = $this->version;
-        $this->options['headers']['x-acs-version']           = $this->version;
-        $signature                                           = $this->httpClient()->getSignature();
-        $this->options['headers']['Date']                    = gmdate($this->dateTimeFormat);
-        $this->options['headers']['Accept']                  = $this->formatToAccept($this->format);
-        $this->options['headers']['x-acs-signature-method']  = $signature->getMethod();
-        $this->options['headers']['x-acs-signature-version'] = $signature->getVersion();
-        if ($signature->getType()) {
-            $this->options['headers']['x-acs-signature-type'] = $signature->getType();
-        }
-        $this->options['headers']['x-acs-region-id'] = $this->realRegionId();
-        if (isset($this->options['form_params'])) {
-            $this->options['headers']['Content-MD5'] = $this->contentMD5();
-        }
-        $this->options['headers']['Content-Type'] = "{$this->options['headers']['Accept']};chrset=utf-8";
-        if ($credential instanceof StsCredential) {
+        if ($credential instanceof StsCredential && $credential->getSecurityToken()) {
             $this->options['headers']['x-acs-security-token'] = $credential->getSecurityToken();
         }
+    }
+
+    /**
+     * @param CredentialsInterface $credential
+     */
+    private function resolveBearerToken(CredentialsInterface $credential)
+    {
         if ($credential instanceof BearerTokenCredential) {
             $this->options['headers']['x-acs-bearer-token'] = $credential->getBearerToken();
         }
-        $this->sign($credential);
     }
 
     /**
@@ -139,21 +179,6 @@ class RoaRequest extends Request
     }
 
     /**
-     * Assign path parameters to the url.
-     *
-     * @return string
-     */
-    private function assignPathParameters()
-    {
-        $result = $this->pathPattern;
-        foreach ($this->pathParameters as $pathParameterKey => $apiParameterValue) {
-            $target = '[' . $pathParameterKey . ']';
-            $result = str_replace($target, $apiParameterValue, $result);
-        }
-        return $result;
-    }
-
-    /**
      * Construct standard Header for Alibaba Cloud.
      *
      * @return string
@@ -172,7 +197,24 @@ class RoaRequest extends Request
         foreach ($sortMap as $sortMapKey => $sortMapValue) {
             $headerString .= $sortMapKey . ':' . $sortMapValue . self::$headerSeparator;
         }
+
         return $headerString;
+    }
+
+    /**
+     * Assign path parameters to the url.
+     *
+     * @return string
+     */
+    private function assignPathParameters()
+    {
+        $result = $this->pathPattern;
+        foreach ($this->pathParameters as $pathParameterKey => $apiParameterValue) {
+            $target = '[' . $pathParameterKey . ']';
+            $result = str_replace($target, $apiParameterValue, $result);
+        }
+
+        return $result;
     }
 
     /**
@@ -213,26 +255,8 @@ class RoaRequest extends Request
             }
             $queryString .= self::$querySeparator;
         }
-        return $queryString;
-    }
 
-    /**
-     * Returns the accept header according to format.
-     *
-     * @param string $format
-     *
-     * @return string
-     */
-    private function formatToAccept($format)
-    {
-        switch (\strtoupper($format)) {
-            case 'JSON':
-                return 'application/json';
-            case 'XML':
-                return 'application/xml';
-            default:
-                return 'application/octet-stream';
-        }
+        return $queryString;
     }
 
     /**
@@ -242,10 +266,21 @@ class RoaRequest extends Request
      * @param string $value
      *
      * @return RoaRequest
+     * @throws ClientException
      */
     public function pathParameter($name, $value)
     {
+        Filter::name($name);
+
+        if ($value === '') {
+            throw new ClientException(
+                'Value cannot be empty',
+                SDK::INVALID_ARGUMENT
+            );
+        }
+
         $this->pathParameters[$name] = $value;
+
         return $this;
     }
 
@@ -255,10 +290,14 @@ class RoaRequest extends Request
      * @param string $pattern
      *
      * @return self
+     * @throws ClientException
      */
     public function pathPattern($pattern)
     {
+        ApiFilter::pattern($pattern);
+
         $this->pathPattern = $pattern;
+
         return $this;
     }
 
@@ -272,17 +311,27 @@ class RoaRequest extends Request
      */
     public function __call($name, $arguments)
     {
-        if (\strpos($name, 'get') !== false) {
+        if (\strpos($name, 'get') === 0) {
             $parameterName = $this->propertyNameByMethodName($name);
+
             return $this->__get($parameterName);
         }
 
-        if (\strpos($name, 'with') !== false) {
+        if (\strpos($name, 'with') === 0) {
             $parameterName = $this->propertyNameByMethodName($name, 4);
             $this->__set($parameterName, $arguments[0]);
             $this->pathParameters[$parameterName] = $arguments[0];
+
+            return $this;
         }
 
-        return $this;
+        if (\strpos($name, 'set') === 0) {
+            $parameterName = $this->propertyNameByMethodName($name);
+            $withMethod    = "with$parameterName";
+
+            return $this->$withMethod($arguments[0]);
+        }
+
+        throw new \RuntimeException('Call to undefined method ' . __CLASS__ . '::' . $name . '()');
     }
 }

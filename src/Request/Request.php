@@ -2,18 +2,28 @@
 
 namespace AlibabaCloud\Client\Request;
 
+use AlibabaCloud\Client\AlibabaCloud;
+use AlibabaCloud\Client\Credentials\Providers\CredentialsProvider;
 use AlibabaCloud\Client\Exception\ClientException;
 use AlibabaCloud\Client\Exception\ServerException;
-use AlibabaCloud\Client\Http\GuzzleTrait;
+use AlibabaCloud\Client\Filter\ApiFilter;
+use AlibabaCloud\Client\Filter\ClientFilter;
+use AlibabaCloud\Client\Filter\Filter;
+use AlibabaCloud\Client\Filter\HttpFilter;
 use AlibabaCloud\Client\Request\Traits\AcsTrait;
 use AlibabaCloud\Client\Request\Traits\ClientTrait;
 use AlibabaCloud\Client\Request\Traits\DeprecatedTrait;
 use AlibabaCloud\Client\Request\Traits\MagicTrait;
 use AlibabaCloud\Client\Result\Result;
+use AlibabaCloud\Client\SDK;
 use AlibabaCloud\Client\Traits\ArrayAccessTrait;
+use AlibabaCloud\Client\Traits\HttpTrait;
 use AlibabaCloud\Client\Traits\ObjectAccessTrait;
+use AlibabaCloud\Client\Traits\RegionTrait;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Uri;
 
 /**
@@ -26,12 +36,23 @@ use GuzzleHttp\Psr7\Uri;
 abstract class Request implements \ArrayAccess
 {
     use DeprecatedTrait;
-    use GuzzleTrait;
+    use HttpTrait;
+    use RegionTrait;
     use MagicTrait;
     use ClientTrait;
     use AcsTrait;
     use ArrayAccessTrait;
     use ObjectAccessTrait;
+
+    /**
+     * Request Connect Timeout
+     */
+    const CONNECT_TIMEOUT = 5;
+
+    /**
+     * Request Timeout
+     */
+    const TIMEOUT = 10;
 
     /**
      * @var string
@@ -51,17 +72,12 @@ abstract class Request implements \ArrayAccess
     /**
      * @var string
      */
-    public $client = \ALIBABA_CLOUD_GLOBAL_CLIENT;
+    public $client;
 
     /**
      * @var Uri
      */
     public $uri;
-
-    /**
-     * @var Client
-     */
-    public $guzzle;
 
     /**
      * @var array The original parameters of the request.
@@ -74,21 +90,64 @@ abstract class Request implements \ArrayAccess
     protected $stringToBeSigned = '';
 
     /**
+     * @var array
+     */
+    private $userAgent = [];
+
+    /**
      * Request constructor.
      *
      * @param array $options
+     *
+     * @throws ClientException
      */
     public function __construct(array $options = [])
     {
+        $this->client                     = CredentialsProvider::getDefaultName();
         $this->uri                        = new Uri();
         $this->uri                        = $this->uri->withScheme($this->scheme);
-        $this->guzzle                     = new Client();
         $this->options['http_errors']     = false;
-        $this->options['timeout']         = ALIBABA_CLOUD_TIMEOUT;
-        $this->options['connect_timeout'] = ALIBABA_CLOUD_CONNECT_TIMEOUT;
+        $this->options['connect_timeout'] = self::CONNECT_TIMEOUT;
+        $this->options['timeout']         = self::TIMEOUT;
         if ($options !== []) {
             $this->options($options);
         }
+
+        if (strtolower(\AlibabaCloud\Client\env('DEBUG')) === 'sdk') {
+            $this->options['debug'] = true;
+        }
+    }
+
+    /**
+     * @param string $name
+     * @param string $value
+     *
+     * @return $this
+     * @throws ClientException
+     */
+    public function appendUserAgent($name, $value)
+    {
+        Filter::name($name);
+
+        Filter::value($value);
+
+        if (!UserAgent::isGuarded($name)) {
+            $this->userAgent[$name] = $value;
+        }
+
+        return $this;
+    }
+
+    /**
+     * @param array $userAgent
+     *
+     * @return $this
+     */
+    public function withUserAgent(array $userAgent)
+    {
+        $this->userAgent = UserAgent::clean($userAgent);
+
+        return $this;
     }
 
     /**
@@ -97,23 +156,31 @@ abstract class Request implements \ArrayAccess
      * @param string $format
      *
      * @return $this
+     * @throws ClientException
      */
     public function format($format)
     {
+        ApiFilter::format($format);
+
         $this->format = \strtoupper($format);
+
         return $this;
     }
 
     /**
      * Set the request body.
      *
-     * @param string $content
+     * @param string $body
      *
      * @return $this
+     * @throws ClientException
      */
-    public function body($content)
+    public function body($body)
     {
-        $this->options['body'] = $content;
+        HttpFilter::body($body);
+
+        $this->options['body'] = $body;
+
         return $this;
     }
 
@@ -123,13 +190,18 @@ abstract class Request implements \ArrayAccess
      * @param array|object $content
      *
      * @return $this
+     * @throws ClientException
      */
     public function jsonBody($content)
     {
-        if (\is_array($content) || \is_object($content)) {
-            $content = \json_encode($content);
+        if (!\is_array($content) && !\is_object($content)) {
+            throw new ClientException(
+                'jsonBody only accepts an array or object',
+                SDK::INVALID_ARGUMENT
+            );
         }
-        return $this->body($content);
+
+        return $this->body(\json_encode($content));
     }
 
     /**
@@ -138,11 +210,15 @@ abstract class Request implements \ArrayAccess
      * @param string $scheme
      *
      * @return $this
+     * @throws ClientException
      */
     public function scheme($scheme)
     {
+        HttpFilter::scheme($scheme);
+
         $this->scheme = \strtolower($scheme);
         $this->uri    = $this->uri->withScheme($this->scheme);
+
         return $this;
     }
 
@@ -152,10 +228,14 @@ abstract class Request implements \ArrayAccess
      * @param string $host
      *
      * @return $this
+     * @throws ClientException
      */
     public function host($host)
     {
+        HttpFilter::host($host);
+
         $this->uri = $this->uri->withHost($host);
+
         return $this;
     }
 
@@ -163,10 +243,12 @@ abstract class Request implements \ArrayAccess
      * @param string $method
      *
      * @return $this
+     * @throws ClientException
      */
     public function method($method)
     {
-        $this->method = \strtoupper($method);
+        $this->method = HttpFilter::method($method);
+
         return $this;
     }
 
@@ -174,10 +256,14 @@ abstract class Request implements \ArrayAccess
      * @param string $clientName
      *
      * @return $this
+     * @throws ClientException
      */
     public function client($clientName)
     {
+        ClientFilter::clientName($clientName);
+
         $this->client = $clientName;
+
         return $this;
     }
 
@@ -205,10 +291,12 @@ abstract class Request implements \ArrayAccess
      */
     public function request()
     {
-        $this->options['headers']['User-Agent'] = $this->userAgentString();
+        $this->options['headers']['User-Agent'] = UserAgent::toString($this->userAgent);
 
+        $this->removeRedundantQuery();
+        $this->removeRedundantHeaders();
+        $this->removeRedundantHFormParams();
         $this->resolveUri();
-
         $this->resolveParameters($this->credential());
 
         if (isset($this->options['form_params'])) {
@@ -229,6 +317,42 @@ abstract class Request implements \ArrayAccess
     }
 
     /**
+     * Remove redundant Query
+     *
+     * @codeCoverageIgnore
+     */
+    private function removeRedundantQuery()
+    {
+        if (isset($this->options['query']) && $this->options['query'] === []) {
+            unset($this->options['query']);
+        }
+    }
+
+    /**
+     * Remove redundant Headers
+     *
+     * @codeCoverageIgnore
+     */
+    private function removeRedundantHeaders()
+    {
+        if (isset($this->options['headers']) && $this->options['headers'] === []) {
+            unset($this->options['headers']);
+        }
+    }
+
+    /**
+     * Remove redundant Headers
+     *
+     * @codeCoverageIgnore
+     */
+    private function removeRedundantHFormParams()
+    {
+        if (isset($this->options['form_params']) && $this->options['form_params'] === []) {
+            unset($this->options['form_params']);
+        }
+    }
+
+    /**
      * @param array $post
      *
      * @return bool|string
@@ -239,7 +363,28 @@ abstract class Request implements \ArrayAccess
         foreach ($post as $apiKey => $apiValue) {
             $content .= "$apiKey=" . urlencode($apiValue) . '&';
         }
+
         return substr($content, 0, -1);
+    }
+
+    /**
+     * @return Client
+     */
+    public static function createClient()
+    {
+        if (AlibabaCloud::hasMock()) {
+            $stack = HandlerStack::create(AlibabaCloud::getMock());
+        } else {
+            $stack = HandlerStack::create();
+        }
+
+        if (AlibabaCloud::isRememberHistory()) {
+            $stack->push(Middleware::history(AlibabaCloud::referenceHistory()));
+        }
+
+        return new Client([
+                              'handler' => $stack,
+                          ]);
     }
 
     /**
@@ -248,7 +393,7 @@ abstract class Request implements \ArrayAccess
     private function response()
     {
         try {
-            return $this->guzzle->request(
+            return self::createClient()->request(
                 $this->method,
                 (string)$this->uri,
                 $this->options
@@ -256,7 +401,7 @@ abstract class Request implements \ArrayAccess
         } catch (GuzzleException $e) {
             throw new ClientException(
                 $e->getMessage(),
-                \ALIBABA_CLOUD_SERVER_UNREACHABLE,
+                SDK::SERVER_UNREACHABLE,
                 $e
             );
         }

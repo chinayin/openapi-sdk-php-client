@@ -37,6 +37,8 @@ class RpcRequestTest extends TestCase
         // Assert
 
         $result = (new DescribeRegionsRequest())->client($nameClient)
+                                                ->connectTimeout(25)
+                                                ->timeout(30)
                                                 ->request();
 
         $this->assertNotNull($result->RequestId);
@@ -45,8 +47,6 @@ class RpcRequestTest extends TestCase
     }
 
     /**
-     * @covers ::booleanValueToString
-     * @covers ::resolveParameters
      * @covers \AlibabaCloud\Client\Request\Request::setQueryParameters
      * @throws ClientException
      */
@@ -74,7 +74,9 @@ class RpcRequestTest extends TestCase
             );
             $this->assertEquals(1, $request->options['query']['test_true']);
             $this->assertEquals(1, $request->options['query']['test_false']);
-            $result = $request->request();
+            $result = $request->connectTimeout(25)
+                              ->timeout(30)
+                              ->request();
             self::assertArrayHasKey('Regions', $result);
         } catch (ServerException $e) {
             $this->assertEquals('UnsupportedSignatureType', $e->getErrorCode());
@@ -90,14 +92,14 @@ class RpcRequestTest extends TestCase
         AlibabaCloud::accessKeyClient(
             \getenv('ACCESS_KEY_ID'),
             \getenv('ACCESS_KEY_SECRET')
-        )->asGlobalClient()->regionId('cn-hangzhou');
+        )->asDefaultClient()->regionId('cn-hangzhou');
 
         $result = (new RpcRequest())->method('POST')
                                     ->product('Cdn')
                                     ->version('2014-11-11')
                                     ->action('DescribeCdnService')
-                                    ->connectTimeout(15)
-                                    ->timeout(20)
+                                    ->connectTimeout(25)
+                                    ->timeout(30)
                                     ->request();
 
         self::assertNotEmpty('PayByTraffic', $result['ChangingChargeType']);

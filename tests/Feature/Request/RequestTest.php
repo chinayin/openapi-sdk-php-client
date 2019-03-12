@@ -15,15 +15,6 @@ use PHPUnit\Framework\TestCase;
  */
 class RequestTest extends TestCase
 {
-    protected function setUp()
-    {
-        parent::setUp();
-        AlibabaCloud::accessKeyClient(
-            \getenv('ACCESS_KEY_ID'),
-            \getenv('ACCESS_KEY_SECRET')
-        )->asGlobalClient()->regionId(\getenv('REGION_ID'));
-    }
-
     /**
      * @throws ClientException
      */
@@ -36,7 +27,9 @@ class RequestTest extends TestCase
 
         // Test
         try {
-            $request->request();
+            $request->connectTimeout(25)
+                    ->timeout(30)
+                    ->request();
         } catch (ServerException $e) {
             // Assert
             self::assertEquals('ErrorClusterNotFound', $e->getErrorCode());
@@ -60,8 +53,8 @@ class RequestTest extends TestCase
             (new  DescribeClusterServicesRequest())
                 ->client('BEARER_TOKEN')
                 ->withClusterId(\time())
-                ->connectTimeout(15)
-                ->timeout(20)
+                ->connectTimeout(25)
+                ->timeout(30)
                 ->request();
         } catch (ServerException $e) {
             // Assert
@@ -85,6 +78,8 @@ class RequestTest extends TestCase
         // Test
         try {
             (new  DescribeClusterServicesRequest())
+                ->connectTimeout(25)
+                ->timeout(30)
                 ->client(__METHOD__)
                 ->withClusterId(\time())
                 ->request();
@@ -105,11 +100,25 @@ class RequestTest extends TestCase
 
         // Test
         try {
-            $request->request();
+            $request->connectTimeout(25)
+                    ->timeout(30)
+                    ->request();
             // Assert
         } catch (ServerException $e) {
             // Assert
             $this->assertEquals('ErrorClusterNotFound', $e->getErrorCode());
         }
+    }
+
+    /**
+     * @throws ClientException
+     */
+    protected function setUp()
+    {
+        parent::setUp();
+        AlibabaCloud::accessKeyClient(
+            \getenv('ACCESS_KEY_ID'),
+            \getenv('ACCESS_KEY_SECRET')
+        )->asDefaultClient()->regionId(\getenv('REGION_ID'));
     }
 }

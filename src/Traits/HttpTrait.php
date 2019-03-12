@@ -1,13 +1,16 @@
 <?php
 
-namespace AlibabaCloud\Client\Http;
+namespace AlibabaCloud\Client\Traits;
+
+use AlibabaCloud\Client\Exception\ClientException;
+use AlibabaCloud\Client\Filter\ClientFilter;
 
 /**
- * Trait GuzzleTrait
+ * Trait HttpTrait
  *
- * @package   AlibabaCloud\Client\Http
+ * @package AlibabaCloud\Client\Traits
  */
-trait GuzzleTrait
+trait HttpTrait
 {
 
     /**
@@ -16,29 +19,15 @@ trait GuzzleTrait
     public $options = [];
 
     /**
-     * @var string|null
-     */
-    public $regionId;
-
-    /**
-     * @param string $region
-     *
-     * @return $this
-     */
-    public function regionId($region)
-    {
-        $this->regionId = $region;
-        return $this;
-    }
-
-    /**
      * @param int|float $timeout
      *
      * @return $this
+     * @throws ClientException
      */
     public function timeout($timeout)
     {
-        $this->options['timeout'] = $timeout;
+        $this->options['timeout'] = ClientFilter::timeout($timeout);
+
         return $this;
     }
 
@@ -46,10 +35,12 @@ trait GuzzleTrait
      * @param int|float $connectTimeout
      *
      * @return $this
+     * @throws ClientException
      */
     public function connectTimeout($connectTimeout)
     {
-        $this->options['connect_timeout'] = $connectTimeout;
+        $this->options['connect_timeout'] = ClientFilter::connectTimeout($connectTimeout);
+
         return $this;
     }
 
@@ -61,6 +52,7 @@ trait GuzzleTrait
     public function debug($debug)
     {
         $this->options['debug'] = $debug;
+
         return $this;
     }
 
@@ -74,6 +66,7 @@ trait GuzzleTrait
     public function cert($cert)
     {
         $this->options['cert'] = $cert;
+
         return $this;
     }
 
@@ -87,6 +80,19 @@ trait GuzzleTrait
     public function proxy($proxy)
     {
         $this->options['proxy'] = $proxy;
+
+        return $this;
+    }
+
+    /**
+     * @param mixed $verify
+     *
+     * @return $this
+     */
+    public function verify($verify)
+    {
+        $this->options['verify'] = $verify;
+
         return $this;
     }
 
@@ -100,6 +106,7 @@ trait GuzzleTrait
         if ($options !== []) {
             $this->options = \AlibabaCloud\Client\arrayMerge([$this->options, $options]);
         }
+
         return $this;
     }
 }

@@ -4,6 +4,7 @@ namespace AlibabaCloud\Client\Request;
 
 use AlibabaCloud\Client\Credentials\AccessKeyCredential;
 use AlibabaCloud\Client\Credentials\BearerTokenCredential;
+use AlibabaCloud\Client\Credentials\CredentialsInterface;
 use AlibabaCloud\Client\Credentials\StsCredential;
 use AlibabaCloud\Client\Exception\ClientException;
 
@@ -19,41 +20,6 @@ class RpcRequest extends Request
      * @var string
      */
     private $dateTimeFormat = 'Y-m-d\TH:i:s\Z';
-
-    /**
-     * Resolve request query.
-     *
-     * @param AccessKeyCredential|BearerTokenCredential|StsCredential $credential
-     *
-     * @throws ClientException
-     */
-    private function resolveQuery($credential)
-    {
-        if (isset($this->options['query'])) {
-            foreach ($this->options['query'] as $key => $value) {
-                $this->options['query'][$key] = $this->booleanValueToString($value);
-            }
-        }
-        $signature                                  = $this->httpClient()->getSignature();
-        $this->options['query']['RegionId']         = $this->realRegionId();
-        $this->options['query']['AccessKeyId']      = $credential->getAccessKeyId();
-        $this->options['query']['Format']           = $this->format;
-        $this->options['query']['SignatureMethod']  = $signature->getMethod();
-        $this->options['query']['SignatureVersion'] = $signature->getVersion();
-        if ($signature->getType()) {
-            $this->options['query']['SignatureType'] = $signature->getType();
-        }
-        $this->options['query']['SignatureNonce'] = md5(uniqid(mt_rand(), true));
-        $this->options['query']['Timestamp']      = gmdate($this->dateTimeFormat);
-        $this->options['query']['Action']         = $this->action;
-        $this->options['query']['Version']        = $this->version;
-        if ($credential instanceof StsCredential) {
-            $this->options['query']['SecurityToken'] = $credential->getSecurityToken();
-        }
-        if ($credential instanceof BearerTokenCredential) {
-            $this->options['query']['BearerToken'] = $credential->getBearerToken();
-        }
-    }
 
     /**
      * Resolve request parameter.
@@ -80,13 +46,46 @@ class RpcRequest extends Request
     }
 
     /**
+     * Resolve request query.
+     *
+     * @param AccessKeyCredential|BearerTokenCredential|StsCredential $credential
+     *
+     * @throws ClientException
+     */
+    private function resolveQuery($credential)
+    {
+        if (isset($this->options['query'])) {
+            foreach ($this->options['query'] as $key => $value) {
+                $this->options['query'][$key] = self::booleanValueToString($value);
+            }
+        }
+        $signature = $this->httpClient()->getSignature();
+        if ($credential->getAccessKeyId()) {
+            $this->options['query']['AccessKeyId'] = $credential->getAccessKeyId();
+        }
+        $this->options['query']['RegionId']         = $this->realRegionId();
+        $this->options['query']['Format']           = $this->format;
+        $this->options['query']['SignatureMethod']  = $signature->getMethod();
+        $this->options['query']['SignatureVersion'] = $signature->getVersion();
+        if ($signature->getType()) {
+            $this->options['query']['SignatureType'] = $signature->getType();
+        }
+        $this->options['query']['SignatureNonce'] = md5(uniqid(mt_rand(), true));
+        $this->options['query']['Timestamp']      = gmdate($this->dateTimeFormat);
+        $this->options['query']['Action']         = $this->action;
+        $this->options['query']['Version']        = $this->version;
+        $this->resolveSecurityToken($credential);
+        $this->resolveBearerToken($credential);
+    }
+
+    /**
      * Convert a Boolean value to a string.
      *
      * @param bool|string $value
      *
      * @return string
      */
-    private function booleanValueToString($value)
+    private static function booleanValueToString($value)
     {
         if (is_bool($value)) {
             if ($value) {
@@ -95,7 +94,28 @@ class RpcRequest extends Request
 
             return 'false';
         }
+
         return $value;
+    }
+
+    /**
+     * @param CredentialsInterface $credential
+     */
+    private function resolveSecurityToken(CredentialsInterface $credential)
+    {
+        if ($credential instanceof StsCredential && $credential->getSecurityToken()) {
+            $this->options['query']['SecurityToken'] = $credential->getSecurityToken();
+        }
+    }
+
+    /**
+     * @param CredentialsInterface $credential
+     */
+    private function resolveBearerToken(CredentialsInterface $credential)
+    {
+        if ($credential instanceof BearerTokenCredential) {
+            $this->options['query']['BearerToken'] = $credential->getBearerToken();
+        }
     }
 
     /**
@@ -134,6 +154,7 @@ class RpcRequest extends Request
         $result = urlencode($string);
         $result = str_replace(['+', '*'], ['%20', '%2A'], $result);
         $result = preg_replace('/%7E/', '~', $result);
+
         return $result;
     }
 
@@ -147,17 +168,27 @@ class RpcRequest extends Request
      */
     public function __call($name, $arguments)
     {
-        if (\strpos($name, 'get') !== false) {
+        if (\strpos($name, 'get') === 0) {
             $parameterName = $this->propertyNameByMethodName($name);
+
             return $this->__get($parameterName);
         }
 
-        if (\strpos($name, 'with') !== false) {
+        if (\strpos($name, 'with') === 0) {
             $parameterName = $this->propertyNameByMethodName($name, 4);
             $this->__set($parameterName, $arguments[0]);
             $this->options['query'][$parameterName] = $arguments[0];
+
+            return $this;
         }
 
-        return $this;
+        if (\strpos($name, 'set') === 0) {
+            $parameterName = $this->propertyNameByMethodName($name);
+            $withMethod    = "with$parameterName";
+
+            return $this->$withMethod($arguments[0]);
+        }
+
+        throw new \RuntimeException('Call to undefined method ' . __CLASS__ . '::' . $name . '()');
     }
 }

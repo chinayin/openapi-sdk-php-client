@@ -3,6 +3,8 @@
 namespace AlibabaCloud\Client\Credentials;
 
 use AlibabaCloud\Client\Exception\ClientException;
+use AlibabaCloud\Client\Filter\CredentialFilter;
+use AlibabaCloud\Client\SDK;
 use Exception;
 
 /**
@@ -33,13 +35,16 @@ class RsaKeyPairCredential implements CredentialsInterface
      */
     public function __construct($publicKeyId, $privateKeyFile)
     {
+        CredentialFilter::publicKeyId($publicKeyId);
+        CredentialFilter::privateKeyFile($privateKeyFile);
+
         $this->publicKeyId = $publicKeyId;
         try {
             $this->privateKey = file_get_contents($privateKeyFile);
         } catch (Exception $exception) {
             throw new ClientException(
                 $exception->getMessage(),
-                \ALIBABA_CLOUD_INVALID_CREDENTIAL
+                SDK::INVALID_CREDENTIAL
             );
         }
     }

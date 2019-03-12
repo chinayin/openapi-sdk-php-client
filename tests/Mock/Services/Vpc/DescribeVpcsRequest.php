@@ -2,6 +2,7 @@
 
 namespace AlibabaCloud\Client\Tests\Mock\Services\Vpc;
 
+use AlibabaCloud\Client\Exception\ClientException;
 use AlibabaCloud\Client\Request\RpcRequest;
 
 /**
@@ -13,9 +14,52 @@ class DescribeVpcsRequest extends RpcRequest
 {
 
     /**
+     * @var
+     */
+    private $vpcName;
+    /**
+     * @var
+     */
+    private $resourceGroupId;
+    /**
+     * @var
+     */
+    private $resourceOwnerId;
+    /**
+     * @var
+     */
+    private $resourceOwnerAccount;
+    /**
+     * @var
+     */
+    private $vpcId;
+    /**
+     * @var
+     */
+    private $ownerAccount;
+    /**
+     * @var
+     */
+    private $pageSize;
+    /**
+     * @var
+     */
+    private $isDefault;
+    /**
+     * @var
+     */
+    private $ownerId;
+    /**
+     * @var
+     */
+    private $pageNumber;
+
+    /**
      * DescribeVpcsRequest constructor.
      *
      * @param array $options
+     *
+     * @throws ClientException
      */
     public function __construct(array $options = [])
     {
@@ -28,56 +72,6 @@ class DescribeVpcsRequest extends RpcRequest
         $this->endpointType = 'openAPI';
         $this->options($options);
     }
-
-    /**
-     * @var
-     */
-    private $vpcName;
-
-    /**
-     * @var
-     */
-    private $resourceGroupId;
-
-    /**
-     * @var
-     */
-    private $resourceOwnerId;
-
-    /**
-     * @var
-     */
-    private $resourceOwnerAccount;
-
-    /**
-     * @var
-     */
-    private $vpcId;
-
-    /**
-     * @var
-     */
-    private $ownerAccount;
-
-    /**
-     * @var
-     */
-    private $pageSize;
-
-    /**
-     * @var
-     */
-    private $isDefault;
-
-    /**
-     * @var
-     */
-    private $ownerId;
-
-    /**
-     * @var
-     */
-    private $pageNumber;
 
     /**
      * @return mixed

@@ -29,26 +29,10 @@ class VirtualAccessKeyCredential
      * @param string $content
      * @param string $fileName
      */
-    protected function __construct($content, $fileName = '')
+    public function __construct($content, $fileName = '')
     {
         $this->content  = $content;
         $this->fileName = $fileName;
-    }
-
-    /**
-     * @return string Virtual Credential Filename
-     */
-    public function url()
-    {
-        $fileName = 'credentials';
-        if ($this->fileName) {
-            $fileName .= "-$this->fileName";
-        }
-
-        return vfsStream::newFile($fileName)
-                        ->withContent($this->content)
-                        ->at(vfsStream::setup('AlibabaCloud'))
-                        ->url();
     }
 
     /**
@@ -77,7 +61,24 @@ proxy_http = tcp://localhost:8125
 proxy_https = tcp://localhost:9124
 proxy_no = .mit.edu,foo.com
 EOT;
+
         return (new static($content))->url();
+    }
+
+    /**
+     * @return string Virtual Credential Filename
+     */
+    public function url()
+    {
+        $fileName = 'credentials';
+        if ($this->fileName) {
+            $fileName .= "-$this->fileName";
+        }
+
+        return vfsStream::newFile($fileName)
+                        ->withContent($this->content)
+                        ->at(vfsStream::setup('AlibabaCloud'))
+                        ->url();
     }
 
     /**
@@ -104,6 +105,7 @@ proxy_http = tcp://localhost:8125
 proxy_https = tcp://localhost:9124
 proxy_no = .mit.edu,foo.com
 EOT;
+
         return (new static($content))->url();
     }
 
@@ -116,6 +118,7 @@ EOT;
 [phpunit]
 enable = true
 EOT;
+
         return (new static($content))->url();
     }
 
@@ -132,6 +135,7 @@ access_key_id = access_key_id
 security_token = security_token
 debug = false
 EOT;
+
         return (new static($content))->url();
     }
 
@@ -143,6 +147,7 @@ EOT;
         $content = <<<EOT
 badFormat
 EOT;
+
         return (new static($content, 'badFormat'))->url();
     }
 
@@ -160,6 +165,7 @@ access_key_secret = access_key_secret
 security_token = security_token
 debug = false
 EOT;
+
         return (new static($content))->url();
     }
 
@@ -173,6 +179,7 @@ EOT;
 enable = true
 type = invalidType
 EOT;
+
         return (new static($content))->url();
     }
 
@@ -189,6 +196,7 @@ access_key_secret = access_key_secret
 security_token = security_token
 debug = false
 EOT;
+
         return (new static($content))->url();
     }
 
@@ -214,6 +222,7 @@ proxy_http = tcp://localhost:8125
 proxy_https = tcp://localhost:9124
 proxy_no = .mit.edu,foo.com
 EOT;
+
         return (new static($content, 'ok'))->url();
     }
 }

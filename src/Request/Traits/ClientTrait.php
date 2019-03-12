@@ -7,6 +7,7 @@ use AlibabaCloud\Client\Clients\Client;
 use AlibabaCloud\Client\Credentials\AccessKeyCredential;
 use AlibabaCloud\Client\Credentials\BearerTokenCredential;
 use AlibabaCloud\Client\Credentials\CredentialsInterface;
+use AlibabaCloud\Client\Credentials\Providers\CredentialsProvider;
 use AlibabaCloud\Client\Credentials\Requests\AssumeRole;
 use AlibabaCloud\Client\Credentials\Requests\GenerateSessionAccessKey;
 use AlibabaCloud\Client\Credentials\StsCredential;
@@ -24,17 +25,6 @@ use AlibabaCloud\Client\Request\Request;
 trait ClientTrait
 {
     /**
-     * Get the client based on the request's settings.
-     *
-     * @return Client
-     * @throws ClientException
-     */
-    public function httpClient()
-    {
-        return AlibabaCloud::get($this->client);
-    }
-
-    /**
      * Return credentials directly if it is an AssumeRole or GenerateSessionAccessKey.
      *
      * @return AccessKeyCredential|BearerTokenCredential|CredentialsInterface|StsCredential
@@ -47,7 +37,34 @@ trait ClientTrait
             return $this->httpClient()->getCredential();
         }
 
-        return $this->httpClient()->getSessionCredential();
+        $timeout = isset($this->options['timeout'])
+            ? $this->options['timeout']
+            : Request::TIMEOUT;
+
+        $connectTimeout = isset($this->options['connect_timeout'])
+            ? $this->options['connect_timeout']
+            : Request::CONNECT_TIMEOUT;
+
+        return $this->httpClient()->getSessionCredential($timeout, $connectTimeout);
+    }
+
+    /**
+     * Get the client based on the request's settings.
+     *
+     * @return Client
+     * @throws ClientException
+     */
+    public function httpClient()
+    {
+        if (!AlibabaCloud::all()) {
+            if (CredentialsProvider::hasCustomChain()) {
+                CredentialsProvider::customProvider($this->client);
+            } else {
+                CredentialsProvider::defaultProvider($this->client);
+            }
+        }
+
+        return AlibabaCloud::get($this->client);
     }
 
     /**

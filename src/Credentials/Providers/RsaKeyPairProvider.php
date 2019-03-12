@@ -5,9 +5,12 @@ namespace AlibabaCloud\Client\Credentials\Providers;
 use AlibabaCloud\Client\AlibabaCloud;
 use AlibabaCloud\Client\Credentials\AccessKeyCredential;
 use AlibabaCloud\Client\Credentials\Requests\GenerateSessionAccessKey;
+use AlibabaCloud\Client\Credentials\StsCredential;
 use AlibabaCloud\Client\Exception\ClientException;
 use AlibabaCloud\Client\Exception\ServerException;
+use AlibabaCloud\Client\Request\Request;
 use AlibabaCloud\Client\Result\Result;
+use AlibabaCloud\Client\SDK;
 use AlibabaCloud\Client\Signature\ShaHmac256WithRsaSignature;
 
 /**
@@ -22,32 +25,29 @@ class RsaKeyPairProvider extends Provider
      * Get credential.
      *
      * @param int $timeout
+     * @param int $connectTimeout
      *
-     * @return AccessKeyCredential
+     * @return StsCredential
      * @throws ClientException
      * @throws ServerException
      */
-    public function get($timeout = \ALIBABA_CLOUD_TIMEOUT)
+    public function get($timeout = Request::TIMEOUT, $connectTimeout = Request::CONNECT_TIMEOUT)
     {
         $credential = $this->getCredentialsInCache();
 
         if ($credential === null) {
-            $result = $this->request($timeout);
+            $result = $this->request($timeout, $connectTimeout);
 
             if (!isset($result['SessionAccessKey']['SessionAccessKeyId'],
                 $result['SessionAccessKey']['SessionAccessKeySecret'])) {
-                throw new ServerException(
-                    $result,
-                    'Result contains no SessionAccessKey',
-                    \ALIBABA_CLOUD_INVALID_CREDENTIAL
-                );
+                throw new ServerException($result, $this->error, SDK::INVALID_CREDENTIAL);
             }
 
             $credential = $result['SessionAccessKey'];
             $this->cache($credential);
         }
 
-        return new AccessKeyCredential(
+        return new StsCredential(
             $credential['SessionAccessKeyId'],
             $credential['SessionAccessKeySecret']
         );
@@ -56,28 +56,30 @@ class RsaKeyPairProvider extends Provider
     /**
      * Get credentials by request.
      *
-     * @param int $timeout
+     * @param $timeout
+     * @param $connectTimeout
      *
      * @return Result
      * @throws ClientException
      * @throws ServerException
      */
-    private function request($timeout)
+    private function request($timeout, $connectTimeout)
     {
         $clientName = __CLASS__ . \uniqid('rsa', true);
+        $credential = $this->client->getCredential();
 
         AlibabaCloud::client(
             new AccessKeyCredential(
-                $this->client->getCredential()->getPublicKeyId(),
-                $this->client->getCredential()->getPrivateKey()
+                $credential->getPublicKeyId(),
+                $credential->getPrivateKey()
             ),
             new ShaHmac256WithRsaSignature()
         )->name($clientName);
 
-        return (new GenerateSessionAccessKey($this->client->getCredential()))
+        return (new GenerateSessionAccessKey($credential->getPublicKeyId()))
             ->client($clientName)
             ->timeout($timeout)
-            ->connectTimeout($timeout)
+            ->connectTimeout($connectTimeout)
             ->debug($this->client->isDebug())
             ->request();
     }

@@ -6,10 +6,12 @@ use AlibabaCloud\Client\Credentials\EcsRamRoleCredential;
 use AlibabaCloud\Client\Credentials\StsCredential;
 use AlibabaCloud\Client\Exception\ClientException;
 use AlibabaCloud\Client\Exception\ServerException;
+use AlibabaCloud\Client\Request\RpcRequest;
 use AlibabaCloud\Client\Result\Result;
-use GuzzleHttp\Client;
+use AlibabaCloud\Client\SDK;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\Http\Message\ResponseInterface;
+use Stringy\Stringy;
 
 /**
  * Class EcsRamRoleProvider
@@ -18,6 +20,19 @@ use Psr\Http\Message\ResponseInterface;
  */
 class EcsRamRoleProvider extends Provider
 {
+
+    /**
+     * Expiration time slot for temporary security credentials.
+     *
+     * @var int
+     */
+
+    protected $expirationSlot = 10;
+
+    /**
+     * @var string
+     */
+    private $uri = 'http://100.100.100.200/latest/meta-data/ram/security-credentials/';
 
     /**
      * Get credential.
@@ -31,16 +46,10 @@ class EcsRamRoleProvider extends Provider
         $result = $this->getCredentialsInCache();
 
         if ($result === null) {
-            $result = $this->request(1);
+            $result = $this->request();
 
-            if (!isset($result['AccessKeyId'],
-                $result['AccessKeySecret'],
-                $result['SecurityToken'])) {
-                throw new ServerException(
-                    $result,
-                    'Result contains no credentials',
-                    \ALIBABA_CLOUD_INVALID_CREDENTIAL
-                );
+            if (!isset($result['AccessKeyId'], $result['AccessKeySecret'], $result['SecurityToken'])) {
+                throw new ServerException($result, $this->error, SDK::INVALID_CREDENTIAL);
             }
 
             $this->cache($result->toArray());
@@ -56,22 +65,22 @@ class EcsRamRoleProvider extends Provider
     /**
      * Get credentials by request.
      *
-     * @param int $timeout
-     *
      * @return Result
      * @throws ClientException
      * @throws ServerException
      */
-    public function request($timeout)
+    public function request()
     {
-        $result = new Result($this->getResponse($timeout));
+        $result = new Result($this->getResponse());
+
+        if ($result->getResponse()->getStatusCode() === 404) {
+            $message = 'The role was not found in the instance';
+            throw new ClientException($message, SDK::INVALID_CREDENTIAL);
+        }
 
         if (!$result->isSuccess()) {
-            throw new ServerException(
-                $result,
-                'Error in retrieving assume role credentials.',
-                \ALIBABA_CLOUD_INVALID_CREDENTIAL
-            );
+            $message = 'Error retrieving credentials from result';
+            throw new ServerException($result, $message, SDK::INVALID_CREDENTIAL);
         }
 
         return $result;
@@ -80,33 +89,36 @@ class EcsRamRoleProvider extends Provider
     /**
      * Get data from meta.
      *
-     * @param $timeout
-     *
      * @return mixed|ResponseInterface
      * @throws ClientException
      */
-    public function getResponse($timeout)
+    public function getResponse()
     {
         /**
          * @var EcsRamRoleCredential $credential
          */
         $credential = $this->client->getCredential();
-        $url        = 'http://100.100.100.200/latest/meta-data/ram/security-credentials/'
-                      . $credential->getRoleName();
+        $url        = $this->uri . $credential->getRoleName();
 
         $options = [
             'http_errors'     => false,
-            'timeout'         => $timeout,
-            'connect_timeout' => $timeout,
+            'timeout'         => 1,
+            'connect_timeout' => 1,
             'debug'           => $this->client->isDebug(),
         ];
 
         try {
-            return (new Client())->request('GET', $url, $options);
+            return RpcRequest::createClient()->request('GET', $url, $options);
         } catch (GuzzleException $e) {
+            if (Stringy::create($e->getMessage())->contains('timed')) {
+                $message = 'Timeout or instance does not belong to Alibaba Cloud';
+            } else {
+                $message = $e->getMessage();
+            }
+
             throw new ClientException(
-                $e->getMessage(),
-                \ALIBABA_CLOUD_SERVER_UNREACHABLE,
+                $message,
+                SDK::SERVER_UNREACHABLE,
                 $e
             );
         }

@@ -12,14 +12,28 @@ use AlibabaCloud\Client\Clients\Client;
 class Provider
 {
     /**
+     * For TSC Duration Seconds
+     */
+    const DURATION_SECONDS = 3600;
+    /**
      * @var array
      */
     protected static $credentialsCache = [];
-
+    /**
+     * Expiration time slot for temporary security credentials.
+     *
+     * @var int
+     */
+    protected $expirationSlot = 180;
     /**
      * @var Client
      */
     protected $client;
+
+    /**
+     * @var string
+     */
+    protected $error = 'Result contains no credentials';
 
     /**
      * CredentialTrait constructor.
@@ -29,6 +43,24 @@ class Provider
     public function __construct(Client $client)
     {
         $this->client = $client;
+    }
+
+    /**
+     * Get the credentials from the cache in the validity period.
+     *
+     * @return array|null
+     */
+    public function getCredentialsInCache()
+    {
+        if (isset(self::$credentialsCache[$this->key()])) {
+            $result = self::$credentialsCache[$this->key()];
+            if (\strtotime($result['Expiration']) - \time() >= $this->expirationSlot) {
+                return $result;
+            }
+            unset(self::$credentialsCache[$this->key()]);
+        }
+
+        return null;
     }
 
     /**
@@ -49,22 +81,5 @@ class Provider
     protected function cache(array $credential)
     {
         self::$credentialsCache[$this->key()] = $credential;
-    }
-
-    /**
-     * Get the credentials from the cache in the validity period.
-     *
-     * @return array|null
-     */
-    public function getCredentialsInCache()
-    {
-        if (isset(self::$credentialsCache[$this->key()])) {
-            $result = self::$credentialsCache[$this->key()];
-            if (\strtotime($result['Expiration']) - \time() >= \ALIBABA_CLOUD_EXPIRATION_INTERVAL) {
-                return $result;
-            }
-        }
-        unset(self::$credentialsCache[$this->key()]);
-        return null;
     }
 }

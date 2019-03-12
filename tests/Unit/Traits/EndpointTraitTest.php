@@ -16,6 +16,9 @@ use PHPUnit\Framework\TestCase;
  */
 class EndpointTraitTest extends TestCase
 {
+    /**
+     * @throws ClientException
+     */
     public function testFindProductDomain()
     {
         $this->assertEquals(
@@ -54,6 +57,8 @@ class EndpointTraitTest extends TestCase
 
     /**
      * Test for AddEndpoint
+     *
+     * @throws ClientException
      */
     public function testAddEndpoint()
     {
@@ -82,92 +87,111 @@ class EndpointTraitTest extends TestCase
     }
 
     /**
-     * @dataProvider products
+     * Test for AddEndpoint
      *
-     * @param string $productName
-     * @param string $serviceCode
-     * @param array  $expectedHost
+     * @throws ClientException
+     * @expectedException \AlibabaCloud\Client\Exception\ClientException
+     * @expectedExceptionMessage Product cannot be empty
      */
-    public function testLocationServiceResolveHost($productName, $serviceCode, array $expectedHost)
+    public function testAddHostWithProductEmpty()
+    {
+        AlibabaCloud::addHost('', 'host', 'regionId');
+    }
+
+    /**
+     * Test for AddEndpoint
+     *
+     * @throws ClientException
+     * @expectedException \AlibabaCloud\Client\Exception\ClientException
+     * @expectedExceptionMessage Product must be a string
+     */
+    public function testAddHostWithProductFormat()
+    {
+        AlibabaCloud::addHost(null, 'host', 'regionId');
+    }
+
+    /**
+     * Test for AddEndpoint
+     *
+     * @throws ClientException
+     * @expectedException \AlibabaCloud\Client\Exception\ClientException
+     * @expectedExceptionMessage Host cannot be empty
+     */
+    public function testAddHostWithHostEmpty()
+    {
+        AlibabaCloud::addHost('product', '', 'regionId');
+    }
+
+    /**
+     * Test for AddEndpoint
+     *
+     * @throws ClientException
+     * @expectedException \AlibabaCloud\Client\Exception\ClientException
+     * @expectedExceptionMessage Host must be a string
+     */
+    public function testAddHostWithHostFormat()
+    {
+        AlibabaCloud::addHost('product', null, 'regionId');
+    }
+
+    /**
+     * Test for AddEndpoint
+     *
+     * @throws ClientException
+     * @expectedException \AlibabaCloud\Client\Exception\ClientException
+     * @expectedExceptionMessage Region ID must be a string
+     */
+    public function testAddHostWithRegionIdFormat()
+    {
+        AlibabaCloud::addHost('product', 'host', null);
+    }
+
+    /**
+     * Test for AddEndpoint
+     *
+     * @throws ClientException
+     * @expectedException \AlibabaCloud\Client\Exception\ClientException
+     * @expectedExceptionMessage Region ID cannot be empty
+     */
+    public function testAddHostWithRegionIdEmpty()
+    {
+        AlibabaCloud::addHost('product', 'host', '');
+    }
+
+    /**
+     * @expectedException \AlibabaCloud\Client\Exception\ServerException
+     * @expectedExceptionMessageRegExp  /Please check the parameters RequestId:/
+     * @throws ClientException
+     */
+    public function testLocationServiceResolveHostWithException()
     {
         // Setup
         $accessKeyId     = \getenv('ACCESS_KEY_ID');
         $accessKeySecret = \getenv('ACCESS_KEY_SECRET');
+        AlibabaCloud::mockResponse(
+            400,
+            [],
+            [
+                                       'Message' => 'Please check the parameters',
+                                   ]
+        );
         AlibabaCloud::accessKeyClient($accessKeyId, $accessKeySecret)
                     ->regionId('cn-hangzhou')
-                    ->asGlobalClient();
+                    ->asDefaultClient();
 
         // Test
-        $request              = new RpcRequest();
-        $request->product     = $productName;
-        $request->serviceCode = $serviceCode;
+        $request = new RpcRequest();
+        $request->connectTimeout(25)->timeout(30);
+        $request->product     = 'Dysmsapi';
+        $request->serviceCode = 'dysmsapi';
 
         // Assert
-        try {
-            $host = LocationService::resolveHost($request);
-            self::assertContains($host, $expectedHost);
-        } catch (ClientException $e) {
-            // Ignore client errors.
-            self::assertNotEmpty($e->getErrorMessage());
-        }
+        LocationService::resolveHost($request);
     }
 
     /**
-     * @return array
+     * @throws ClientException
      */
-    public function products()
-    {
-        return [
-            [
-                'Slb',
-                'slb',
-                [
-                    'slb.aliyuncs.com',
-                    '',
-                ],
-            ],
-            [
-                'Dysmsapi',
-                'dysmsapi',
-                [
-                    '',
-                ],
-            ],
-            [
-                'Ess',
-                'ess',
-                [
-                    'ess.aliyuncs.com',
-                    '',
-                ],
-            ],
-            [
-                'EHPC',
-                'ehs',
-                [
-                    'ehpc.cn-hangzhou.aliyuncs.com',
-                    '',
-                ],
-            ],
-            [
-                'EHPC',
-                'badServiceCode',
-                [
-                    'ehpc.cn-hangzhou.aliyuncs.com',
-                    '',
-                ],
-            ],
-            [
-                'Slb',
-                '',
-                [
-                    'slb.aliyuncs.com',
-                    '',
-                ],
-            ],
-        ];
-    }
-
     public function testAddGlobalHost()
     {
         // Setup
@@ -181,6 +205,9 @@ class EndpointTraitTest extends TestCase
         self::assertEquals($host, AlibabaCloud::resolveHost($product));
     }
 
+    /**
+     * @throws ClientException
+     */
     public function testGlobal()
     {
         // Assert
@@ -190,6 +217,8 @@ class EndpointTraitTest extends TestCase
 
     /**
      * Test for Null
+     *
+     * @throws ClientException
      */
     public function testNull()
     {

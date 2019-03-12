@@ -2,6 +2,11 @@
 
 namespace AlibabaCloud\Client;
 
+use AlibabaCloud\Client\Exception\ClientException;
+use Closure;
+use League\CLImate\CLImate;
+use Stringy\Stringy;
+
 /*
 |--------------------------------------------------------------------------
 | Global Functions for Alibaba Cloud
@@ -13,11 +18,74 @@ namespace AlibabaCloud\Client;
 */
 
 /**
- * @return \League\CLImate\CLImate
+ * @param      $filename
+ * @param bool $throwException
+ *
+ * @return bool
+ * @throws ClientException
+ */
+function inOpenBasedir($filename, $throwException = false)
+{
+    $open_basedir = ini_get('open_basedir');
+    if (!$open_basedir) {
+        return true;
+    }
+
+    $dirs = explode(PATH_SEPARATOR, $open_basedir);
+    if (empty($dirs)) {
+        return true;
+    }
+
+    if (inDir($filename, $dirs)) {
+        return true;
+    }
+
+    if ($throwException === false) {
+        return false;
+    }
+
+    throw new ClientException(
+        'open_basedir restriction in effect. '
+        . "File($filename) is not within the allowed path(s): ($open_basedir)",
+        'SDK.InvalidPath'
+    );
+}
+
+/**
+ * @param string $filename
+ * @param array  $dirs
+ *
+ * @return bool
+ */
+function inDir($filename, array $dirs)
+{
+    foreach ($dirs as $dir) {
+        if (!Stringy::create($dir)->endsWith(DIRECTORY_SEPARATOR)) {
+            $dir .= DIRECTORY_SEPARATOR;
+        }
+
+        if (0 === strpos($filename, $dir)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * @return bool
+ */
+function isWindows()
+{
+    return PATH_SEPARATOR === ';';
+}
+
+/**
+ * @return CLImate
  */
 function cliMate()
 {
-    return new \League\CLImate\CLImate();
+    return new CLImate();
 }
 
 /**
@@ -153,5 +221,98 @@ function arrayMerge(array $arrays)
             $result[$key] = $value;
         }
     }
+
     return $result;
+}
+
+/**
+ * Gets the value of an environment variable.
+ *
+ * @param  string $key
+ * @param  mixed  $default
+ *
+ * @return mixed
+ */
+function env($key, $default = null)
+{
+    $value = getenv($key);
+
+    if ($value === false) {
+        return value($default);
+    }
+
+    if (envSubstr($value)) {
+        return substr($value, 1, -1);
+    }
+
+    return envConversion($value);
+}
+
+/**
+ * @param $value
+ *
+ * @return bool|string|null
+ */
+function envConversion($value)
+{
+    $key = strtolower($value);
+
+    if ($key === 'null' || $key === '(null)') {
+        return null;
+    }
+
+    $list = [
+        'true'    => true,
+        '(true)'  => true,
+        'false'   => false,
+        '(false)' => false,
+        'empty'   => '',
+        '(empty)' => '',
+    ];
+
+    return isset($list[$key]) ? $list[$key] : $value;
+}
+
+/**
+ * @param $key
+ *
+ * @return bool|mixed
+ * @throws ClientException
+ */
+function envNotEmpty($key)
+{
+    $value = env($key, false);
+    if ($value !== false && !$value) {
+        throw new ClientException(
+            "Environment variable '$key' cannot be empty",
+            SDK::INVALID_ARGUMENT
+        );
+    }
+    if ($value) {
+        return $value;
+    }
+
+    return false;
+}
+
+/**
+ * @param $value
+ *
+ * @return bool
+ */
+function envSubstr($value)
+{
+    return ($valueLength = strlen($value)) > 1 && strpos($value, '"') === 0 && $value[$valueLength - 1] === '"';
+}
+
+/**
+ * Return the default value of the given value.
+ *
+ * @param  mixed $value
+ *
+ * @return mixed
+ */
+function value($value)
+{
+    return $value instanceof Closure ? $value() : $value;
 }

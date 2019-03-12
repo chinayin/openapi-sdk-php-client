@@ -32,6 +32,19 @@ class ConfigTest extends TestCase
     }
 
     /**
+     * @param $value
+     *
+     * @throws \ReflectionException
+     */
+    private static function setStaticProperty($value)
+    {
+        $ref      = new \ReflectionClass(Config::class);
+        $property = $ref->getProperty('configManager');
+        $property->setAccessible(true);
+        $property->setValue($value);
+    }
+
+    /**
      * @throws \ReflectionException
      */
     public function testGetConfigManager()
@@ -72,19 +85,7 @@ EOT;
         self::$vfs = vfsStream::newFile('config')
                               ->withContent($content)
                               ->at($root);
-        return self::$vfs;
-    }
 
-    /**
-     * @param $value
-     *
-     * @throws \ReflectionException
-     */
-    private static function setStaticProperty($value)
-    {
-        $ref      = new \ReflectionClass(Config::class);
-        $property = $ref->getProperty('configManager');
-        $property->setAccessible(true);
-        $property->setValue($value);
+        return self::$vfs;
     }
 }

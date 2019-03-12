@@ -17,13 +17,12 @@ class RsaKeyPairClientTest extends TestCase
 {
 
     /**
-     * @return RsaKeyPairClient
      * @throws ClientException
      */
     public function testConstruct()
     {
         // Setup
-        $publicKeyId    = \time();
+        $publicKeyId    = \AlibabaCloud\Client\env('PUBLIC_KEY_ID');
         $privateKeyFile = VirtualRsaKeyPairCredential::privateKeyFileUrl();
 
         // Test
@@ -36,26 +35,5 @@ class RsaKeyPairClientTest extends TestCase
             $client->getCredential()->getPrivateKey()
         );
         self::assertInstanceOf(ShaHmac1Signature::class, $client->getSignature());
-
-        return $client;
-    }
-
-    /**
-     * @depends testConstruct
-     *
-     * @param RsaKeyPairClient $client
-     *
-     * @throws \AlibabaCloud\Client\Exception\ServerException
-     */
-    public function testGetSessionCredential(RsaKeyPairClient $client)
-    {
-        try {
-            $client->getSessionCredential();
-        } catch (ClientException $exception) {
-            self::assertEquals(
-                $exception->getErrorCode(),
-                \ALIBABA_CLOUD_INVALID_CREDENTIAL
-            );
-        }
     }
 }

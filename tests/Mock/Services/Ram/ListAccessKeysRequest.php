@@ -2,6 +2,7 @@
 
 namespace AlibabaCloud\Client\Tests\Mock\Services\Ram;
 
+use AlibabaCloud\Client\Exception\ClientException;
 use AlibabaCloud\Client\Request\RpcRequest;
 
 /**
@@ -13,9 +14,16 @@ class ListAccessKeysRequest extends RpcRequest
 {
 
     /**
+     * @var
+     */
+    private $userName;
+
+    /**
      * ListAccessKeysRequest constructor.
      *
      * @param array $options
+     *
+     * @throws ClientException
      */
     public function __construct(array $options = [])
     {
@@ -27,11 +35,6 @@ class ListAccessKeysRequest extends RpcRequest
         $this->action('ListAccessKeys');
         $this->options($options);
     }
-
-    /**
-     * @var
-     */
-    private $userName;
 
     /**
      * @return mixed
@@ -50,6 +53,7 @@ class ListAccessKeysRequest extends RpcRequest
     {
         $this->userName                     = $userName;
         $this->options['query']['UserName'] = $userName;
+
         return $this;
     }
 }

@@ -3,6 +3,7 @@
 namespace AlibabaCloud\Client\Config;
 
 use clagiordano\weblibs\configmanager\ConfigManager;
+use Exception;
 
 /**
  * Class Config
@@ -34,26 +35,28 @@ class Config
     }
 
     /**
-     * @param string $configPath
-     * @param mixed  $newValue
-     *
-     * @return ConfigManager
-     * @throws \Exception
-     */
-    public static function set($configPath, $newValue)
-    {
-        self::getConfigManager()->setValue(\strtolower($configPath), $newValue);
-        return self::getConfigManager()->saveConfigFile();
-    }
-
-    /**
      * @return ConfigManager
      */
     private static function getConfigManager()
     {
         if (!self::$configManager instanceof ConfigManager) {
-            self::$configManager = new ConfigManager(__DIR__ . '/Data.php');
+            self::$configManager = new ConfigManager(__DIR__ . DIRECTORY_SEPARATOR . 'Data.php');
         }
+
         return self::$configManager;
+    }
+
+    /**
+     * @param string $configPath
+     * @param mixed  $newValue
+     *
+     * @return ConfigManager
+     * @throws Exception
+     */
+    public static function set($configPath, $newValue)
+    {
+        self::getConfigManager()->setValue(\strtolower($configPath), $newValue);
+
+        return self::getConfigManager()->saveConfigFile();
     }
 }

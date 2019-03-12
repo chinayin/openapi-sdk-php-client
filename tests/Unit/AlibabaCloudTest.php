@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Class AlibabaCloudTest
  *
- * @package   AlibabaCloud\Client\Tests\Unit\Client
+ * @package   AlibabaCloud\Client\Tests\Unit
  *
  * @coversDefaultClass \AlibabaCloud\Client\AlibabaCloud
  */
@@ -24,7 +24,7 @@ class AlibabaCloudTest extends TestCase
      * @expectedException \AlibabaCloud\Client\Exception\ClientException
      * @expectedExceptionMessage Please install alibabacloud/sdk to support product quick access.
      */
-    public function testCallStatic()
+    public static function testCallStatic()
     {
         AlibabaCloud::Ecs();
     }
